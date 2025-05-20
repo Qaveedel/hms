@@ -13,7 +13,6 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  useTheme,
   useMediaQuery,
 } from '@mui/material';
 import {
@@ -26,11 +25,15 @@ import {
   CalendarToday as CalendarIcon,
   Medication as MedicationIcon,
 } from '@mui/icons-material';
+import { useTheme as useMuiTheme } from '@mui/material/styles';
+import ThemeToggle from './ThemeToggle';
+import { useTheme as useAppTheme } from '../theme/ThemeContext';
 
 function Layout({ children }) {
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const muiTheme = useMuiTheme();
+  const { darkMode } = useAppTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [drawerOpen, setDrawerOpen] = React.useState(!isMobile);
 
   const menuItems = [
@@ -58,7 +61,7 @@ function Layout({ children }) {
           height: '64px',
           display: 'flex',
           justifyContent: 'center',
-          backgroundColor: 'white',
+          backgroundColor: darkMode ? 'background.paper' : 'white',
           color: 'text.primary',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           left: 0,
@@ -67,16 +70,18 @@ function Layout({ children }) {
         }}
       >
         <Toolbar sx={{ justifyContent: 'space-between', flexDirection: 'row-reverse' }}>
-          <IconButton
-            color="inherit"
-            onClick={() => setDrawerOpen(!drawerOpen)}
-            sx={{
-              display: 'block',
-              ml: 1,
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              color="inherit"
+              onClick={() => setDrawerOpen(!drawerOpen)}
+              sx={{
+                ml: 1,
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <ThemeToggle />
+          </Box>
           
           <Typography 
             variant="h6" 
@@ -85,7 +90,7 @@ function Layout({ children }) {
               flexGrow: 1,
               textAlign: 'center',
               fontWeight: 'bold',
-              color: theme.palette.primary.main
+              color: muiTheme.palette.primary.main
             }}
           >
             سیستم مدیریت هوشمند مدارک پزشکی بارمان
@@ -101,7 +106,7 @@ function Layout({ children }) {
                 marginRight: '4px',
               },
               whiteSpace: 'nowrap',
-              color: theme.palette.primary.main
+              color: muiTheme.palette.primary.main
             }}
           >
             خروج
@@ -119,11 +124,11 @@ function Layout({ children }) {
           mr: drawerOpen ? `${drawerWidth}px` : 0,
           position: 'relative',
           padding: 3,
-          backgroundColor: '#f5f5f5',
+          backgroundColor: 'background.default',
           marginTop: '64px',
-          transition: theme.transitions.create(['margin', 'width'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
+          transition: muiTheme.transitions.create(['margin', 'width'], {
+            easing: muiTheme.transitions.easing.sharp,
+            duration: muiTheme.transitions.duration.leavingScreen,
           }),
         }}
       >
@@ -144,9 +149,9 @@ function Layout({ children }) {
             right: 0,
             width: drawerWidth,
             height: 'calc(100% - 64px)',
-            backgroundColor: '#f8f9fa',
+            backgroundColor: darkMode ? 'background.paper' : '#f8f9fa',
             boxSizing: 'border-box',
-            borderLeft: '1px solid rgba(0,0,0,0.12)',
+            borderLeft: darkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.12)',
             borderRight: 'none',
           },
         }}
@@ -154,7 +159,7 @@ function Layout({ children }) {
       >
         <Box sx={{ overflow: 'auto' }}>
           <List>
-            {menuItems.map((item, index) => (
+            {menuItems.map((item) => (
               <ListItem 
                 button 
                 key={item.text}
@@ -164,19 +169,23 @@ function Layout({ children }) {
                 }}
                 sx={{
                   '&:hover': {
-                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                    backgroundColor: darkMode 
+                      ? 'rgba(144, 202, 249, 0.08)' 
+                      : 'rgba(25, 118, 210, 0.08)',
                   },
-                  borderBottom: '1px solid #eee',
+                  borderBottom: darkMode 
+                    ? '1px solid rgba(255,255,255,0.05)' 
+                    : '1px solid #eee',
                   '&:last-child': { borderBottom: 'none' },
                   padding: '16px 24px',
                   textAlign: 'right',
                   transition: 'all 0.3s ease',
                   '&:hover .MuiListItemIcon-root': {
-                    color: theme.palette.primary.main,
+                    color: muiTheme.palette.primary.main,
                     transform: 'scale(1.1)',
                   },
                   '&:hover .MuiListItemText-primary': {
-                    color: theme.palette.primary.main,
+                    color: muiTheme.palette.primary.main,
                   }
                 }}
               >
@@ -207,17 +216,19 @@ function Layout({ children }) {
               onClick={handleLogout}
               sx={{
                 '&:hover': {
-                  backgroundColor: 'rgba(220, 0, 78, 0.08)',
+                  backgroundColor: darkMode 
+                    ? 'rgba(244, 67, 54, 0.08)' 
+                    : 'rgba(220, 0, 78, 0.08)',
                 },
                 padding: '16px 24px',
                 textAlign: 'right',
                 transition: 'all 0.3s ease',
                 '&:hover .MuiListItemIcon-root': {
-                  color: theme.palette.error.main,
+                  color: muiTheme.palette.error.main,
                   transform: 'scale(1.1)',
                 },
                 '&:hover .MuiListItemText-primary': {
-                  color: theme.palette.error.main,
+                  color: muiTheme.palette.error.main,
                 }
               }}
             >

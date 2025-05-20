@@ -87,9 +87,12 @@ function PatientList() {
 
   const handleClickOpen = (patient = null) => {
     if (patient) {
+      console.log('Editing patient with id:', patient.id, 'and ID:', patient.ID);
       setEditingPatient(patient);
       setNewPatient({
         ...patient,
+        id: patient.id || patient.ID,
+        ID: patient.ID || patient.id,
         height: patient.height || '',
         weight: patient.weight || '',
       });
@@ -151,7 +154,9 @@ function PatientList() {
       };
 
       if (editingPatient) {
-        await api.put(`/api/users/${editingPatient.id}`, patientData);
+        const patientId = editingPatient.id || editingPatient.ID;
+        patientData.id = patientId;
+        await api.put(`/api/users/${patientId}`, patientData);
       } else {
         await api.post('/api/users', patientData);
       }

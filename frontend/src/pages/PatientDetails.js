@@ -862,15 +862,15 @@ function PatientDetails() {
                              visit.type === 'doctor_visit' ? 'ویزیت پزشک' : 
                              visit.type === 'prescription' ? 'نسخه‌نویسی' : 
                              'مراجعه'} - {new Date(visit.date || visit.Date || visit.created_at || visit.CreatedAt).toLocaleDateString('fa-IR')}
-                          </Typography>
-                        </Box>
+              </Typography>
+            </Box>
                         
                         {/* Enhanced triage data display */}
                         {visit.TriageData && (
                           <>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                               <strong>علائم:</strong> {visit.TriageData.symptoms || visit.TriageData.Symptoms || '-'}
-                            </Typography>
+              </Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
                               <Chip 
                                 size="small" 
@@ -903,7 +903,7 @@ function PatientDetails() {
                                   'success'
                                 }
                               />
-                            </Box>
+            </Box>
                           </>
                         )}
                         
@@ -912,7 +912,7 @@ function PatientDetails() {
                           <Box sx={{ mt: 1 }}>
                             <Typography variant="body2" color="text.primary" sx={{ fontWeight: '500' }}>
                               <strong>تشخیص:</strong> {visit.DoctorReport.diagnosis || visit.DoctorReport.Diagnosis || '-'}
-                            </Typography>
+              </Typography>
                             {(visit.DoctorReport.notes || visit.DoctorReport.Notes) && (
                               <Typography variant="body2" color="text.secondary" noWrap>
                                 <strong>توضیحات:</strong> {visit.DoctorReport.notes || visit.DoctorReport.Notes}
@@ -923,7 +923,7 @@ function PatientDetails() {
                                 <strong>پیگیری:</strong> {visit.DoctorReport.follow_up_date}
                               </Typography>
                             )}
-                          </Box>
+            </Box>
                         )}
                         
                         <Button 
@@ -955,7 +955,7 @@ function PatientDetails() {
           </Paper>
 
           {/* Recent Prescriptions section */}
-          <Paper sx={{ 
+           <Paper sx={{ 
             p: 3, 
             background: 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(12px)',
@@ -983,14 +983,14 @@ function PatientDetails() {
                           <Typography variant="subtitle2">
                             نسخه {index + 1} - {new Date(prescription.created_at || prescription.CreatedAt).toLocaleDateString('fa-IR')}
                           </Typography>
-                        </Box>
+            </Box>
                         <Typography variant="body2" color="text.secondary">
                           پزشک: {prescription.doctor_name || 'نامشخص'}
-                        </Typography>
+            </Typography>
                         <Typography variant="body2" color="text.secondary">
                           تعداد داروها: {(prescription.items || []).length || '0'}
                         </Typography>
-                      </Box>
+            </Box>
                     </ListItem>
                   ))}
               </List>
@@ -1005,12 +1005,12 @@ function PatientDetails() {
                 >
                   مشاهده همه
                 </Button>
-              </Box>
+            </Box>
             )}
           </Paper>
-          
+
           {/* Medical Conditions Summary */}
-          <Paper sx={{ 
+           <Paper sx={{ 
             p: 3, 
             background: 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(12px)',
@@ -1018,7 +1018,7 @@ function PatientDetails() {
             border: '1px solid rgba(0, 0, 0, 0.1)',
             direction: 'rtl'
           }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <MedicalInfoIcon sx={{ ml: 1 }} /> خلاصه سوابق پزشکی
             </Typography>
             
@@ -1055,22 +1055,22 @@ function PatientDetails() {
         {/* Middle and Left Columns */}
         <Grid item xs={12} md={8}>
           {/* Main patient info tabs */}
-          <Paper sx={{ 
-            p: 3, 
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(12px)',
-            borderRadius: '15px',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
-          }}>
-            <Tabs
-              value={activeTab}
-              onChange={handleTabChange}
+      <Paper sx={{ 
+        p: 3,
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(12px)',
+        borderRadius: '15px',
+        border: '1px solid rgba(0, 0, 0, 0.1)',
+      }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange}
               variant="scrollable"
               scrollButtons="auto"
-              sx={{ 
+          sx={{
                 borderBottom: 1, 
                 borderColor: 'divider',
-                '& .MuiTab-root': { 
+            '& .MuiTab-root': {
                   fontSize: '0.85rem',
                   fontWeight: 'medium',
                   px: { xs: 1, sm: 2 },
@@ -1085,12 +1085,12 @@ function PatientDetails() {
               <Tab label="تصاویر پزشکی" />
               <Tab label="سوابق جراحی" />
               <Tab label="سوابق مراجعات" />
-              <Tab label="نوبت‌ها" />
+          <Tab label="نوبت‌ها" />
               <Tab label="نسخه‌ها" />
-            </Tabs>
-            
+        </Tabs>
+
             {/* Personal Information Tab */}
-            <TabPanel value={activeTab} index={0}>
+        <TabPanel value={activeTab} index={0}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" color="text.secondary">نام</Typography>
@@ -1386,7 +1386,7 @@ function PatientDetails() {
                                 />
                               ) : (
                                 <Box 
-                                  sx={{ 
+              sx={{ 
                                     width: '100%', 
                                     height: '100%', 
                                     display: 'flex', 
@@ -1474,7 +1474,7 @@ function PatientDetails() {
                                  visit.type === 'doctor_visit' ? 'ویزیت پزشک' : 
                                  visit.type === 'prescription' ? 'نسخه‌نویسی' : 
                                  'مراجعه'}
-                              </Typography>
+              </Typography>
                               <Typography variant="subtitle2" color="text.secondary">
                                 {new Date(visit.date || visit.Date || visit.created_at || visit.CreatedAt).toLocaleDateString('fa-IR')}
                               </Typography>
@@ -1482,7 +1482,7 @@ function PatientDetails() {
                             
                             {/* Enhanced summary showing triage data */}
                             {visit.TriageData && (
-                              <Box sx={{ mt: 1 }}>
+                <Box sx={{ mt: 1 }}>
                                 <Typography variant="body2" color="text.secondary">
                                   <strong>علائم:</strong> {visit.TriageData.symptoms || visit.TriageData.Symptoms || '-'}
                                 </Typography>
@@ -1518,13 +1518,13 @@ function PatientDetails() {
                                       'success'
                                     }
                                   />
-                                </Box>
-                              </Box>
-                            )}
+                  </Box>
+                </Box>
+              )}
                             
                             {/* Enhanced summary showing doctor's diagnosis */}
                             {visit.DoctorReport && (
-                              <Box sx={{ mt: 1 }}>
+                <Box sx={{ mt: 1 }}>
                                 <Typography variant="body2" color="text.primary" sx={{ fontWeight: '500' }}>
                                   <strong>تشخیص:</strong> {visit.DoctorReport.diagnosis || visit.DoctorReport.Diagnosis || '-'}
                                 </Typography>
@@ -1538,8 +1538,8 @@ function PatientDetails() {
                                     <strong>پیگیری:</strong> {visit.DoctorReport.follow_up_date}
                                   </Typography>
                                 )}
-                              </Box>
-                            )}
+                </Box>
+              )}
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails>
@@ -1657,8 +1657,8 @@ function PatientDetails() {
                     ))}
                 </Box>
               )}
-            </TabPanel>
-            
+        </TabPanel>
+
             {/* NEW TAB: Appointments */}
             <TabPanel value={activeTab} index={8}>
               <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
@@ -1679,7 +1679,7 @@ function PatientDetails() {
                 <>
                   <Typography variant="subtitle1" sx={{ mb: 2, color: 'primary.main' }}>
                     نوبت‌های آینده
-                  </Typography>
+              </Typography>
                   <TableContainer component={Paper} variant="outlined" sx={{ mb: 4 }}>
                     <Table size="small">
                       <TableHead>
@@ -1800,23 +1800,23 @@ function PatientDetails() {
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                             <Typography variant="h6">
                               نسخه شماره {index + 1}
-                            </Typography>
+                  </Typography>
                             <Typography variant="body2" color="text.secondary">
                               {new Date(prescription.created_at || prescription.CreatedAt).toLocaleDateString('fa-IR')}
-                            </Typography>
+                  </Typography>
                           </Box>
                           
                           <Box sx={{ mb: 2 }}>
                             <Typography variant="subtitle2" color="text.secondary">
                               پزشک: {prescription.doctor_name || prescription.DoctorName || 'نامشخص'}
-                            </Typography>
+                  </Typography>
                             
                             {prescription.notes && (
                               <Typography variant="body2">
                                 توضیحات: {prescription.notes || prescription.Notes}
                               </Typography>
                             )}
-                          </Box>
+                </Box>
                           
                           <Typography variant="subtitle1" sx={{ mb: 1 }}>داروهای تجویز شده</Typography>
                           
@@ -1866,7 +1866,7 @@ function PatientDetails() {
                     ))}
                 </Box>
               )}
-            </TabPanel>
+        </TabPanel>
           </Paper>
         </Grid>
       </Grid>
@@ -1895,7 +1895,7 @@ function PatientDetails() {
           background: 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(12px)',
           borderRadius: '15px',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
+                 border: '1px solid rgba(0, 0, 0, 0.1)',
         }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center' }}>
@@ -1934,7 +1934,7 @@ function PatientDetails() {
                                    visit.type === 'doctor_visit' ? 'ویزیت پزشک' : 
                                    visit.type === 'prescription' ? 'نسخه‌نویسی' : 
                                    'مراجعه'}
-                        </Typography>
+              </Typography>
                         <Typography variant="subtitle2" color="text.secondary">
                           {new Date(visit.date || visit.Date || visit.created_at || visit.CreatedAt).toLocaleDateString('fa-IR')}
                         </Typography>
@@ -1984,7 +1984,7 @@ function PatientDetails() {
                                 </Grid>
                                 <Grid item xs={12}>
                                   <Typography variant="body2" color="text.secondary">اولویت:</Typography>
-                                  <Chip 
+              <Chip 
                                     size="small"
                                     label={
                                       (visit.TriageData.priority_level || visit.TriageData.PriorityLevel) === 'critical' ? 'بحرانی' : 
@@ -2060,7 +2060,7 @@ function PatientDetails() {
                 </Accordion>
               ))
           )}
-        </Paper>
+      </Paper>
       </Box>
     </Box>
   );
