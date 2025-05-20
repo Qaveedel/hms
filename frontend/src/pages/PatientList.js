@@ -22,6 +22,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Avatar,
+  styled,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -29,6 +31,8 @@ import {
   Visibility as VisibilityIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  CloudUpload as UploadIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -40,11 +44,25 @@ const api = axios.create({
   },
 });
 
+// Add styled component for hidden input
+const VisuallyHiddenInput = styled('input')({
+  clip: 'rect(0 0 0 0)',
+  clipPath: 'inset(50%)',
+  height: 1,
+  overflow: 'hidden',
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  whiteSpace: 'nowrap',
+  width: 1,
+});
+
 function PatientList() {
   const [patients, setPatients] = useState([]);
   const [open, setOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState('');
   const [newPatient, setNewPatient] = useState({
     first_name: '',
     last_name: '',
@@ -62,6 +80,7 @@ function PatientList() {
     hair_color: '',
     eye_color: '',
     skin_color: '',
+    profile_photo: '',
   });
 
   const navigate = useNavigate();
@@ -85,6 +104,20 @@ function PatientList() {
     }
   };
 
+  // Add a handler for file upload
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const photoUrl = URL.createObjectURL(file);
+      setProfilePhotoPreview(photoUrl);
+      setNewPatient({
+        ...newPatient,
+        profile_photo: photoUrl,
+        photo_file: file
+      });
+    }
+  };
+
   const handleClickOpen = (patient = null) => {
     if (patient) {
       console.log('Editing patient with id:', patient.id, 'and ID:', patient.ID);
@@ -96,6 +129,7 @@ function PatientList() {
         height: patient.height || '',
         weight: patient.weight || '',
       });
+      setProfilePhotoPreview(patient.profile_photo || '');
     } else {
       setEditingPatient(null);
       setNewPatient({
@@ -115,7 +149,9 @@ function PatientList() {
         hair_color: '',
         eye_color: '',
         skin_color: '',
+        profile_photo: '',
       });
+      setProfilePhotoPreview('');
     }
     setOpen(true);
   };
@@ -123,6 +159,7 @@ function PatientList() {
   const handleClose = () => {
     setOpen(false);
     setEditingPatient(null);
+    setProfilePhotoPreview('');
   };
 
   const handleInputChange = (e) => {
@@ -152,6 +189,13 @@ function PatientList() {
         height: newPatient.height ? parseFloat(newPatient.height) : 0,
         weight: newPatient.weight ? parseFloat(newPatient.weight) : 0,
       };
+
+      // Remove photo_file from data before sending to API
+      if (patientData.photo_file) {
+        // In a real app, you would upload the file to server
+        // For now, just keep the profile_photo URL
+        delete patientData.photo_file;
+      }
 
       if (editingPatient) {
         const patientId = editingPatient.id || editingPatient.ID;
@@ -268,6 +312,32 @@ function PatientList() {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* Profile Photo Upload */}
+            <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Avatar
+                  sx={{
+                    width: 120,
+                    height: 120,
+                    mb: 2,
+                    bgcolor: profilePhotoPreview ? 'transparent' : '#00bcd4'
+                  }}
+                  src={profilePhotoPreview}
+                >
+                  {!profilePhotoPreview && <PersonIcon sx={{ fontSize: 60 }} />}
+                </Avatar>
+                <Button
+                  component="label"
+                  variant="contained"
+                  startIcon={<UploadIcon />}
+                  sx={{ mb: 2 }}
+                >
+                  انتخاب عکس پروفایل
+                  <VisuallyHiddenInput type="file" accept="image/*" onChange={handleFileChange} />
+                </Button>
+              </Box>
+            </Grid>
+
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -403,14 +473,20 @@ function PatientList() {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="نوع بیمه"
-                name="insurance"
-                value={newPatient.insurance}
-                onChange={handleInputChange}
-                InputProps={{ dir: 'rtl' }}
-              />
+              <FormControl fullWidth dir="rtl">
+                <InputLabel>نوع بیمه</InputLabel>
+                <Select
+                  name="insurance"
+                  value={newPatient.insurance}
+                  onChange={handleInputChange}
+                  label="نوع بیمه"
+                >
+                  <MenuItem value="">بدون بیمه</MenuItem>
+                  <MenuItem value="بیمه ایران">بیمه ایران</MenuItem>
+                  <MenuItem value="بیمه آسیا">بیمه آسیا</MenuItem>
+                  <MenuItem value="بیمه پاسارگاد">بیمه پاسارگاد</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12} sm={4}>
               <TextField

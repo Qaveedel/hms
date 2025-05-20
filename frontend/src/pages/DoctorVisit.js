@@ -30,7 +30,7 @@ function DoctorVisit() {
   useEffect(() => {
     if (id && id !== 'undefined') {
       setLoading(true);
-      fetchPatientData();
+    fetchPatientData();
     }
   }, [id]);
 
@@ -111,7 +111,7 @@ function DoctorVisit() {
         navigate(`/prescription/${id}`);
       } else {
         // Show success message or navigate back to patient details
-        navigate(`/patients/${id}`);
+      navigate(`/patients/${id}`);
       }
     } catch (error) {
       console.error('Error submitting visit:', error);
@@ -335,39 +335,39 @@ function DoctorVisit() {
           تشخیص پزشک
         </Typography>
         
-        <TextField
-          fullWidth
-          label="تشخیص"
-          name="diagnosis"
-          value={visitData.diagnosis}
-          onChange={handleInputChange}
-          multiline
+              <TextField
+                fullWidth
+                label="تشخیص"
+                name="diagnosis"
+                value={visitData.diagnosis}
+                onChange={handleInputChange}
+                multiline
           rows={6}
-          required
+                required
           inputProps={{ dir: 'rtl' }}
           sx={{ mb: 3, mt: 2 }}
           placeholder="لطفا تشخیص خود را اینجا وارد کنید..."
         />
         
-        <Divider sx={{ my: 2 }} />
+              <Divider sx={{ my: 2 }} />
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-          <Button
-            variant="outlined"
+                <Button
+                  variant="outlined"
             color="error"
             onClick={() => {
               setPatient(null);
               setNationalId('');
               navigate('/doctor-visit');
             }}
-          >
-            انصراف
-          </Button>
+                >
+                  انصراف
+                </Button>
           
           <Box>
-            <Button
-              variant="contained"
-              color="primary"
+                <Button
+                  variant="contained"
+                  color="primary"
               onClick={() => handleSave(false)}
               sx={{ ml: 1 }}
             >
@@ -381,8 +381,8 @@ function DoctorVisit() {
               sx={{ ml: 1 }}
             >
               ذخیره و تجویز دارو
-            </Button>
-          </Box>
+                </Button>
+              </Box>
         </Box>
       </Paper>
     </Box>

@@ -39,6 +39,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  ListItemIcon,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -63,7 +64,8 @@ import {
   Assignment as AssignmentIcon,
   CloudUpload as UploadIcon,
   ZoomIn as ZoomInIcon,
-  Surgery as SurgeryIcon,
+  MedicalServices as SurgeryIcon,
+  AddAPhoto as AddAPhotoIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { styled } from '@mui/material/styles';
@@ -153,6 +155,9 @@ function PatientDetails() {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
 
+  // Update state to include user profile photo
+  const [profilePhoto, setProfilePhoto] = useState(null);
+
   useEffect(() => {
     if (id) {
       fetchPatientData();
@@ -172,6 +177,20 @@ function PatientDetails() {
       const patientRes = await axios.get(`http://localhost:8080/api/users/${id}`);
       console.log('Patient data received:', patientRes.data);
       setPatient(patientRes.data);
+      
+      // Set profile photo if available - ensure we check all possible property names
+      if (patientRes.data.profile_photo) {
+        setProfilePhoto(patientRes.data.profile_photo);
+        console.log('Profile photo URL loaded:', patientRes.data.profile_photo);
+      } else if (patientRes.data.profilePhoto) {
+        setProfilePhoto(patientRes.data.profilePhoto);
+        console.log('Profile photo URL loaded (from profilePhoto):', patientRes.data.profilePhoto);
+      } else if (patientRes.data.photo) {
+        setProfilePhoto(patientRes.data.photo);
+        console.log('Profile photo URL loaded (from photo):', patientRes.data.photo);
+      } else {
+        console.log('No profile photo found in patient data');
+      }
 
       try {
         const [
@@ -286,7 +305,13 @@ function PatientDetails() {
   // Dialog handlers
   const openDialog = (type, data = {}) => {
     setDialogType(type);
-    setDialogData({ ...data, user_id: parseInt(id) });
+    
+    if (type === 'patient-info') {
+      setDialogData({ ...patient });
+    } else {
+      setDialogData({ ...data, user_id: parseInt(id) });
+    }
+    
     setDialogOpen(true);
   };
   
@@ -325,6 +350,7 @@ function PatientDetails() {
       let endpoint = '';
       let updateFunction;
       let data = { ...dialogData };
+      let imageData = null;
       
       switch(dialogType) {
         case 'hereditary-disease':
@@ -356,6 +382,48 @@ function PatientDetails() {
         case 'surgery':
           endpoint = '/api/surgeries';
           updateFunction = setSurgeries;
+          
+          // If there's a photo uploaded with the surgery, create a medical image record as well
+          if (uploadedFile) {
+            const imageUrl = URL.createObjectURL(uploadedFile);
+            data.image_url = imageUrl; // Add image URL to surgery data
+            
+            // Save image data to create a medical image after surgery record is created
+            imageData = {
+              user_id: parseInt(id),
+              image_url: imageUrl,
+              description: `تصویر مرتبط با جراحی: ${data.name}`,
+              center_name: data.center_name || 'نامشخص',
+              date: data.date,
+              related_record_type: 'surgery',
+              related_record_id: data.id || null // Will be updated for new records
+            };
+          }
+          break;
+        case 'patient-info':
+          endpoint = '/api/users';
+          updateFunction = setPatient;
+          
+          // Sanitize insurance field to ensure it's a valid value
+          if (data.insurance && 
+              data.insurance !== 'بیمه ایران' && 
+              data.insurance !== 'بیمه آسیا' && 
+              data.insurance !== 'بیمه پاسارگاد') {
+            data.insurance = ''; // Reset to empty if invalid
+          }
+          
+          // Handle profile photo if updated
+          if (data.photo_file) {
+            // In a real app, you'd upload the file to server
+            // For now, just update the URL
+            data.profile_photo = data.profile_photo || URL.createObjectURL(data.photo_file);
+            
+            // Update the profile photo state
+            setProfilePhoto(data.profile_photo);
+            
+            // Remove the file object before sending to API
+            delete data.photo_file;
+          }
           break;
         default:
           closeDialog();
@@ -364,14 +432,50 @@ function PatientDetails() {
 
       let response;
       
-      if (dialogData.id) {
-        // Update existing record
-        response = await axios.put(`http://localhost:8080${endpoint}/${dialogData.id}`, data);
+      if (data.id || dialogType === 'patient-info') {
+        // Handle ID properly when updating - remove ID to prevent sending duplicate key in SQL
+        const dataId = data.id || id;
         
-        if (updateFunction) {
+        // For patient info updates, ensure we're using PUT to update the user
+        if (dialogType === 'patient-info') {
+          console.log('Updating patient info with ID:', dataId);
+          try {
+            response = await axios.put(`http://localhost:8080${endpoint}/${dataId}`, data);
+            // Update local state with the returned data
+            const updatedPatient = response.data;
+            
+            // Make sure profile photo is preserved
+            if (data.profile_photo && !updatedPatient.profile_photo) {
+              updatedPatient.profile_photo = data.profile_photo;
+            }
+            
+            setPatient(updatedPatient);
+            setProfilePhoto(updatedPatient.profile_photo);
+            console.log('Patient info updated successfully:', updatedPatient);
+          } catch (updateError) {
+            console.error('Error updating patient info:', updateError);
+            throw updateError;
+          }
+        } else if (dialogType === 'surgery') {
+          const { id, ...dataToUpdate } = data;
+          // Update existing record
+          response = await axios.put(`http://localhost:8080${endpoint}/${dataId}`, dataToUpdate);
+        } else {
+          // Update existing record
+          response = await axios.put(`http://localhost:8080${endpoint}/${dataId}`, data);
+        }
+        
+        if (updateFunction && dialogType !== 'patient-info') {
           updateFunction(prev => 
-            prev.map(item => item.id === dialogData.id ? response.data : item)
+            prev.map(item => item.id === dataId ? response.data : item)
           );
+        }
+        
+        // If this is a surgery with an image, add or update related medical image
+        if (dialogType === 'surgery' && imageData) {
+          imageData.related_record_id = dataId;
+          const imageResponse = await axios.post(`http://localhost:8080/api/medical-images`, imageData);
+          setMedicalImages(prev => [...prev, imageResponse.data]);
         }
       } else {
         // Create new record
@@ -379,6 +483,13 @@ function PatientDetails() {
         
         if (updateFunction) {
           updateFunction(prev => [...prev, response.data]);
+        }
+        
+        // If this is a surgery with an image, create related medical image
+        if (dialogType === 'surgery' && imageData) {
+          imageData.related_record_id = response.data.id;
+          const imageResponse = await axios.post(`http://localhost:8080/api/medical-images`, imageData);
+          setMedicalImages(prev => [...prev, imageResponse.data]);
         }
       }
       
@@ -389,7 +500,7 @@ function PatientDetails() {
       closeDialog();
     } catch (error) {
       console.error('Error submitting data:', error);
-      // You could show an error message here
+      alert('خطا در ثبت اطلاعات. لطفاً دوباره تلاش کنید.');
     }
   };
   
@@ -661,6 +772,57 @@ function PatientDetails() {
               onChange={handleDialogInputChange}
               InputLabelProps={{ shrink: true }}
             />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>مرتبط با</InputLabel>
+              <Select
+                name="related_record_type"
+                value={dialogData.related_record_type || ''}
+                label="مرتبط با"
+                onChange={handleDialogInputChange}
+              >
+                <MenuItem value="">بدون ارتباط</MenuItem>
+                <MenuItem value="surgery">جراحی</MenuItem>
+                <MenuItem value="visit">ویزیت</MenuItem>
+              </Select>
+            </FormControl>
+            
+            {dialogData.related_record_type === 'surgery' && (
+              <FormControl fullWidth margin="normal">
+                <InputLabel>انتخاب جراحی</InputLabel>
+                <Select
+                  name="related_record_id"
+                  value={dialogData.related_record_id || ''}
+                  label="انتخاب جراحی"
+                  onChange={handleDialogInputChange}
+                >
+                  {surgeries.map(surgery => (
+                    <MenuItem key={surgery.id} value={surgery.id}>
+                      {surgery.name} - {formatDate(surgery.date)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+            
+            {dialogData.related_record_type === 'visit' && (
+              <FormControl fullWidth margin="normal">
+                <InputLabel>انتخاب ویزیت</InputLabel>
+                <Select
+                  name="related_record_id"
+                  value={dialogData.related_record_id || ''}
+                  label="انتخاب ویزیت"
+                  onChange={handleDialogInputChange}
+                >
+                  {visits.map((visit, index) => (
+                    <MenuItem key={visit.id || visit.ID || index} value={visit.id || visit.ID || index}>
+                      {visit.type === 'triage' ? 'تریاژ' : 
+                       visit.type === 'doctor_visit' ? 'ویزیت پزشک' : 
+                       'ویزیت'} - {formatDate(visit.date || visit.Date || visit.created_at || visit.CreatedAt)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
           </>
         );
         
@@ -697,6 +859,219 @@ function PatientDetails() {
               value={dialogData.description || ''}
               onChange={handleDialogInputChange}
             />
+            <TextField
+              fullWidth
+              margin="normal"
+              label="مرکز درمانی"
+              name="center_name"
+              value={dialogData.center_name || ''}
+              onChange={handleDialogInputChange}
+            />
+            
+            {/* Add photo upload option for surgeries */}
+            <Box sx={{ mt: 3, mb: 2, border: '1px dashed #ccc', p: 2, borderRadius: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                تصویر مرتبط با جراحی
+              </Typography>
+              <Box sx={{ textAlign: 'center', mb: 3 }}>
+                {imagePreview ? (
+                  <Box sx={{ position: 'relative', width: '100%', maxWidth: 300, mx: 'auto' }}>
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      style={{ width: '100%', maxHeight: 200, objectFit: 'contain' }} 
+                    />
+                    <IconButton 
+                      sx={{ position: 'absolute', top: 5, right: 5, bgcolor: 'rgba(255,255,255,0.7)' }}
+                      size="small"
+                      onClick={() => {
+                        setUploadedFile(null);
+                        setImagePreview('');
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Button
+                    component="label"
+                    variant="contained"
+                    startIcon={<UploadIcon />}
+                    sx={{ mb: 2 }}
+                  >
+                    انتخاب تصویر جراحی
+                    <VisuallyHiddenInput type="file" accept="image/*" onChange={handleFileChange} />
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          </>
+        );
+        
+      case 'patient-info':
+        return (
+          <>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <Box sx={{ mt: 2, textAlign: 'center' }}>
+                  <Typography variant="subtitle2" gutterBottom>عکس پروفایل</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                    <Avatar
+                      sx={{
+                        width: 100, 
+                        height: 100, 
+                        mb: 2,
+                        bgcolor: dialogData.profile_photo ? 'transparent' : '#00bcd4'
+                      }}
+                      src={dialogData.profile_photo || profilePhoto}
+                    >
+                      {!dialogData.profile_photo && !profilePhoto && <PersonIcon sx={{ fontSize: 50 }} />}
+                    </Avatar>
+                    <Button
+                      component="label"
+                      variant="contained"
+                      startIcon={<UploadIcon />}
+                    >
+                      انتخاب عکس پروفایل
+                      <VisuallyHiddenInput type="file" accept="image/*" onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          const photoUrl = URL.createObjectURL(file);
+                          setDialogData({
+                            ...dialogData,
+                            profile_photo: photoUrl,
+                            photo_file: file
+                          });
+                        }
+                      }} />
+                    </Button>
+                  </Box>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="نام"
+                  name="first_name"
+                  value={dialogData.first_name || ''}
+                  onChange={handleDialogInputChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="نام خانوادگی"
+                  name="last_name"
+                  value={dialogData.last_name || ''}
+                  onChange={handleDialogInputChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="نام پدر"
+                  name="father_name"
+                  value={dialogData.father_name || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="کد ملی"
+                  name="national_id"
+                  value={dialogData.national_id || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="تلفن همراه"
+                  name="mobile_phone"
+                  value={dialogData.mobile_phone || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="تلفن ثابت"
+                  name="landline_phone"
+                  value={dialogData.landline_phone || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="قد (سانتی‌متر)"
+                  name="height"
+                  type="number"
+                  value={dialogData.height || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="وزن (کیلوگرم)"
+                  name="weight"
+                  type="number"
+                  value={dialogData.weight || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="گروه خونی"
+                  name="blood_type"
+                  value={dialogData.blood_type || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth margin="normal">
+                  <InputLabel>بیمه</InputLabel>
+                  <Select
+                    name="insurance"
+                    value={dialogData.insurance || ''}
+                    label="بیمه"
+                    onChange={handleDialogInputChange}
+                  >
+                    <MenuItem value="">بدون بیمه</MenuItem>
+                    <MenuItem value="بیمه ایران">بیمه ایران</MenuItem>
+                    <MenuItem value="بیمه آسیا">بیمه آسیا</MenuItem>
+                    <MenuItem value="بیمه پاسارگاد">بیمه پاسارگاد</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="آدرس"
+                  name="address"
+                  multiline
+                  rows={3}
+                  value={dialogData.address || ''}
+                  onChange={handleDialogInputChange}
+                />
+              </Grid>
+            </Grid>
           </>
         );
         
@@ -721,8 +1096,100 @@ function PatientDetails() {
         return `${action} تصویر پزشکی`;
       case 'surgery':
         return `${action} عمل جراحی`;
+      case 'patient-info':
+        return 'ویرایش اطلاعات بیمار';
       default:
         return 'فرم';
+    }
+  };
+
+  // Update the date formatting function to use Iranian calendar and 24h format
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    
+    // Parse the input date
+    const date = new Date(dateString);
+    
+    // Function to convert to Persian date
+    function gregorianToJalali(gy, gm, gd) {
+      var g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+      var jy = (gy <= 1600) ? 0 : 979;
+      gy -= (gy <= 1600) ? 621 : 1600;
+      var gy2 = (gm > 2) ? (gy + 1) : gy;
+      var days = (365 * gy) + (parseInt((gy2 + 3) / 4)) - (parseInt((gy2 + 99) / 100)) + 
+                (parseInt((gy2 + 399) / 400)) - 80 + gd + g_d_m[gm - 1];
+      jy += 33 * (parseInt(days / 12053));
+      days %= 12053;
+      jy += 4 * (parseInt(days / 1461));
+      days %= 1461;
+      jy += parseInt((days - 1) / 365);
+      if (days > 365) days = (days - 1) % 365;
+      var jm = (days < 186) ? 1 + parseInt(days / 31) : 7 + parseInt((days - 186) / 30);
+      var jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+      return [jy, jm, jd];
+    }
+    
+    // Convert date to Persian calendar
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    
+    const [jYear, jMonth, jDay] = gregorianToJalali(year, month, day);
+    
+    // Format day and month to always have two digits
+    const formattedDay = jDay < 10 ? `0${jDay}` : `${jDay}`;
+    const formattedMonth = jMonth < 10 ? `0${jMonth}` : `${jMonth}`;
+    
+    return `${formattedDay}-${formattedMonth}-${jYear}`;
+  };
+  
+  // Format time separately with 24h format
+  const formatTime = (dateString) => {
+    if (!dateString) return '-';
+    
+    const date = new Date(dateString);
+    
+    // Use 24-hour format (no AM/PM)
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
+  // Add function to handle profile photo upload
+  const handleProfilePhotoUpload = async (file) => {
+    if (!file) return;
+
+    try {
+      // Create form data for file upload
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('user_id', id);
+
+      // Create object URL for preview
+      const photoUrl = URL.createObjectURL(file);
+      
+      // Update patient data with new photo
+      const updatedPatient = {
+        ...patient,
+        profile_photo: photoUrl
+      };
+      
+      console.log('Updating profile photo for user:', id);
+      
+      // Update API with the profile photo URL
+      try {
+        await axios.put(`http://localhost:8080/api/users/${id}`, {
+          ...patient,
+          profile_photo: photoUrl
+        });
+        console.log('Profile photo URL saved to server');
+      } catch (apiError) {
+        console.error('Error saving profile photo URL to server:', apiError);
+      }
+      
+      // Update local state
+      setProfilePhoto(photoUrl);
+      setPatient(updatedPatient);
+    } catch (error) {
+      console.error('Error uploading profile photo:', error);
     }
   };
 
@@ -734,58 +1201,125 @@ function PatientDetails() {
     return <Typography>در حال بارگذاری...</Typography>;
   }
 
+  const PersonalInfoItem = ({ label, value, icon }) => (
+    <ListItem sx={{ textAlign: 'right', direction: 'rtl', paddingY: 1, display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+      <ListItemIcon sx={{ minWidth: 'auto', color: 'primary.main', ml: 2 }}> {/* Adjusted margins */}
+        {icon}
+      </ListItemIcon>
+      <ListItemText 
+        primaryTypographyProps={{ fontWeight: 'medium', textAlign: 'right', color: 'text.secondary' }} 
+        secondaryTypographyProps={{ fontWeight: 'bold', textAlign: 'right', color: 'text.primary' }}
+        primary={label} 
+        secondary={value || 'ثبت نشده'} 
+        sx={{ textAlign: 'right', m: 0 }} /* Ensure ListItemText itself is aligned and remove default margins */
+      />
+    </ListItem>
+  );
+
   return (
     <Box sx={{ 
       p: 3,
-      background: 'linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%)',
+      background: (theme) => theme.palette.mode === 'dark' 
+        ? theme.palette.background.default
+        : 'linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%)',
       minHeight: '100vh',
-      color: '#333'
+      color: (theme) => theme.palette.text.primary
     }}>
       {/* Top Section: Patient Basic Info */}
       <Paper sx={{ 
         p: 3,
-        mb: 4,
-        background: 'rgba(255, 255, 255, 0.9)',
+        background: (theme) => theme.palette.mode === 'dark' 
+          ? 'rgba(30, 30, 30, 0.9)'
+          : 'rgba(255, 255, 255, 0.9)',
         backdropFilter: 'blur(12px)',
         borderRadius: '15px',
-        border: '1px solid rgba(0, 0, 0, 0.1)',
+        border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
         display: 'flex',
         alignItems: 'center',
-        direction: 'rtl'
+        justifyContent: 'space-between', // Changed from flex-end to space-between
+        direction: 'rtl',
+        mb: 4  // Increase bottom margin for more spacing
       }}>
-        {/* Placeholder for Patient Photo */}
-        <Avatar sx={{ width: 80, height: 80, bgcolor: '#00bcd4', ml: 3, flexShrink: 0 }}>
-          <PersonIcon sx={{ fontSize: 40 }} />
-        </Avatar>
-        <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 0.5, overflowWrap: 'break-word' }}>
+        {/* User Text Content - Move to first position for RTL */}
+        <Box sx={{ flex: 1, textAlign: 'right', mr: 0 }}> {/* Changed mr: 3 to mr: 0 */}
+          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 0.5, overflowWrap: 'break-word', direction: 'rtl' }}>
             {patient.first_name} {patient.last_name}
           </Typography>
-          <Typography variant="subtitle1" sx={{ color: '#555', overflowWrap: 'break-word' }}>
+          <Typography variant="subtitle1" sx={{ color: '#555', overflowWrap: 'break-word', direction: 'rtl' }}>
             کد ملی: {patient.national_id}
           </Typography>
+        </Box>
+        
+        {/* User Photo with Upload capability - Moved to second position */}
+        <Box sx={{ position: 'relative', flexShrink: 0 }}>
+          <Avatar 
+            sx={{ 
+              width: 80, 
+              height: 80, 
+              bgcolor: profilePhoto ? 'transparent' : '#00bcd4',
+              border: (theme) => `2px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)'}`,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+            src={profilePhoto}
+          >
+            {!profilePhoto && <PersonIcon sx={{ fontSize: 40 }} />}
+          </Avatar>
+          <IconButton 
+            size="small" 
+            sx={{ 
+              position: 'absolute', 
+              bottom: -5, 
+              right: -5, 
+              bgcolor: 'primary.main',
+              color: 'white',
+              '&:hover': { bgcolor: 'primary.dark' },
+              boxShadow: 1
+            }}
+            component="label"
+          >
+            <input
+              type="file"
+              hidden
+              accept="image/*"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleProfilePhotoUpload(e.target.files[0]);
+                }
+              }}
+            />
+            <AddAPhotoIcon fontSize="small" />
+          </IconButton>
         </Box>
       </Paper>
 
       {/* Three Column Layout */}
-      <Grid container spacing={3} direction="row-reverse">
+      <Grid container spacing={4} direction="row-reverse">  {/* Increased spacing between grid items */}
 
         {/* Right Column: Actions and Quick Info */}
         <Grid item xs={12} md={4}>
           {/* Action buttons section */}
           <Paper sx={{ 
             p: 3, 
-            background: 'rgba(255, 255, 255, 0.9)',
+            background: (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(30, 30, 30, 0.9)'
+              : 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(12px)',
             borderRadius: '15px',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
+            border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
             mb: 3,
             display: 'flex',
             flexDirection: 'column',
             direction: 'rtl'
           }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <HospitalIcon sx={{ ml: 1 }} /> عملیات و دسترسی سریع
+            <Typography variant="h6" gutterBottom sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              mb: 2, 
+              justifyContent: 'flex-end',
+              width: '100%',
+              direction: 'rtl'
+            }}>
+              <HospitalIcon sx={{ ml: 1.5 }} /> عملیات و دسترسی سریع
             </Typography>
             <Button
               variant="contained"
@@ -793,7 +1327,16 @@ function PatientDetails() {
               onClick={() => navigate(`/triage/${id}`)}
               startIcon={<DescriptionIcon />}
               fullWidth
-              sx={{ mb: 1.5, justifyContent: 'flex-start' }}
+              sx={{ 
+                mb: 1.5,
+                direction: 'rtl',
+                textAlign: 'right',
+                justifyContent: 'flex-start',
+                '& .MuiButton-startIcon': {
+                  marginLeft: 1,
+                  marginRight: -1
+                }
+              }}
             >
               ثبت تریاژ
             </Button>
@@ -803,7 +1346,16 @@ function PatientDetails() {
               onClick={() => navigate(`/doctor-visit/${id}`)}
               startIcon={<HistoryEduIcon />}
               fullWidth
-              sx={{ mb: 1.5, justifyContent: 'flex-start' }}
+              sx={{ 
+                mb: 1.5,
+                direction: 'rtl',
+                textAlign: 'right',
+                justifyContent: 'flex-start',
+                '& .MuiButton-startIcon': {
+                  marginLeft: 1,
+                  marginRight: -1
+                }
+              }}
             >
               ثبت ویزیت پزشک
             </Button>
@@ -813,7 +1365,16 @@ function PatientDetails() {
               onClick={() => navigate(`/prescription/${id}`)}
               startIcon={<MedicationIcon />}
               fullWidth
-              sx={{ mb: 1.5, justifyContent: 'flex-start' }}
+              sx={{ 
+                mb: 1.5,
+                direction: 'rtl',
+                textAlign: 'right',
+                justifyContent: 'flex-start',
+                '& .MuiButton-startIcon': {
+                  marginLeft: 1,
+                  marginRight: -1
+                }
+              }}
             >
               ثبت نسخه
             </Button>
@@ -823,7 +1384,16 @@ function PatientDetails() {
               onClick={() => navigate(`/appointment/${id}`)}
               startIcon={<EventIcon />}
               fullWidth
-              sx={{ mb: 1.5, justifyContent: 'flex-start' }}
+              sx={{ 
+                mb: 1.5,
+                direction: 'rtl',
+                textAlign: 'right',
+                justifyContent: 'flex-start',
+                '& .MuiButton-startIcon': {
+                  marginLeft: 1,
+                  marginRight: -1
+                }
+              }}
             >
               نوبت‌دهی
             </Button>
@@ -832,15 +1402,24 @@ function PatientDetails() {
           {/* Recent Visits section */}
           <Paper sx={{ 
             p: 3, 
-            background: 'rgba(255, 255, 255, 0.9)',
+            background: (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(30, 30, 30, 0.9)'
+              : 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(12px)',
             borderRadius: '15px',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
+            border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
             mb: 3,
             direction: 'rtl'
           }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <HistoryEduIcon sx={{ ml: 1 }} color="primary" /> مراجعات اخیر
+                        <Typography variant="h6" gutterBottom sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              mb: 2, 
+              justifyContent: 'flex-end',
+              width: '100%',
+              direction: 'rtl'
+            }}>              
+              <HistoryEduIcon sx={{ ml: 1.5 }} color="primary" /> مراجعات اخیر
             </Typography>
             
             {visits.length === 0 ? (
@@ -861,7 +1440,7 @@ function PatientDetails() {
                             {visit.type === 'triage' ? 'تریاژ' : 
                              visit.type === 'doctor_visit' ? 'ویزیت پزشک' : 
                              visit.type === 'prescription' ? 'نسخه‌نویسی' : 
-                             'مراجعه'} - {new Date(visit.date || visit.Date || visit.created_at || visit.CreatedAt).toLocaleDateString('fa-IR')}
+                             'مراجعه'} - {formatDate(visit.date || visit.Date || visit.created_at || visit.CreatedAt)}
               </Typography>
             </Box>
                         
@@ -957,16 +1536,16 @@ function PatientDetails() {
           {/* Recent Prescriptions section */}
            <Paper sx={{ 
             p: 3, 
-            background: 'rgba(255, 255, 255, 0.9)',
+            background: (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(30, 30, 30, 0.9)'
+              : 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(12px)',
             borderRadius: '15px',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
+            border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
             mb: 3,
             direction: 'rtl'
           }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <MedicationIcon sx={{ ml: 1 }} color="primary" /> نسخه‌های اخیر
-            </Typography>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>              <MedicationIcon sx={{ ml: 1.5 }} color="primary" /> نسخه‌های اخیر            </Typography>
             
             {prescriptions.length === 0 ? (
               <Typography align="center" color="text.secondary">نسخه‌ای ثبت نشده است</Typography>
@@ -981,8 +1560,8 @@ function PatientDetails() {
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                           <AssignmentIcon fontSize="small" sx={{ ml: 1, color: 'primary.main' }} />
                           <Typography variant="subtitle2">
-                            نسخه {index + 1} - {new Date(prescription.created_at || prescription.CreatedAt).toLocaleDateString('fa-IR')}
-                          </Typography>
+                            نسخه {index + 1} - {formatDate(prescription.created_at || prescription.CreatedAt)}
+            </Typography>
             </Box>
                         <Typography variant="body2" color="text.secondary">
                           پزشک: {prescription.doctor_name || 'نامشخص'}
@@ -1012,42 +1591,49 @@ function PatientDetails() {
           {/* Medical Conditions Summary */}
            <Paper sx={{ 
             p: 3, 
-            background: 'rgba(255, 255, 255, 0.9)',
+            background: (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(30, 30, 30, 0.9)'
+              : 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(12px)',
             borderRadius: '15px',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
-            direction: 'rtl'
+            border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+            direction: 'rtl',
+            textAlign: 'right'
           }}>
-             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <MedicalInfoIcon sx={{ ml: 1 }} /> خلاصه سوابق پزشکی
-            </Typography>
+             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>              
+               <MedicalInfoIcon sx={{ ml: 1.5 }} /> خلاصه سوابق پزشکی            
+             </Typography>
             
             {allergies.length > 0 && (
               <Alert severity="warning" variant="filled" sx={{ mb: 2, direction: 'rtl', textAlign: 'right' }}>
-                <Typography variant="body2">
-                  <strong>آلرژی‌ها:</strong> {allergies.map(a => a.name).join('، ')}
-                </Typography>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+                  <AllergyIcon sx={{ ml: 1.5 }} fontSize="small" /> <strong>آلرژی‌ها:</strong> {allergies.map(a => a.name).join('، ')}
+            </Typography>
               </Alert>
             )}
             
             {chronicConditions.length > 0 && (
               <Alert severity="info" sx={{ mb: 2, direction: 'rtl', textAlign: 'right' }}>
-                <Typography variant="body2">
-                  <strong>بیماری‌های مزمن:</strong> {chronicConditions.map(c => c.name).join('، ')}
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+                  <HeartIcon sx={{ ml: 1.5 }} fontSize="small" /> <strong>بیماری‌های مزمن:</strong> {chronicConditions.map(c => c.name).join('، ')}
                 </Typography>
               </Alert>
             )}
             
             {hereditaryDiseases.length > 0 && (
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>بیماری‌های وراثتی:</strong> {hereditaryDiseases.map(d => d.name).join('، ')}
-              </Typography>
+              <Box sx={{ mb: 2, p: 1, backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)', borderRadius: '8px' }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+                  <MedicalInfoIcon sx={{ ml: 1.5 }} fontSize="small" /> <strong>بیماری‌های وراثتی:</strong> {hereditaryDiseases.map(d => d.name).join('، ')}
+                </Typography>
+            </Box>
             )}
             
             {disabilities.length > 0 && (
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>معلولیت‌ها:</strong> {disabilities.map(d => d.name).join('، ')}
-              </Typography>
+              <Box sx={{ mb: 1, p: 1, backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)', borderRadius: '8px' }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+                  <AccessibilityIcon sx={{ ml: 1.5 }} fontSize="small" /> <strong>معلولیت‌ها:</strong> {disabilities.map(d => d.name).join('، ')}
+                </Typography>
+            </Box>
             )}
           </Paper>
         </Grid>
@@ -1055,27 +1641,297 @@ function PatientDetails() {
         {/* Middle and Left Columns */}
         <Grid item xs={12} md={8}>
           {/* Main patient info tabs */}
+           <Paper sx={{ 
+            p: 3, 
+            background: (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(30, 30, 30, 0.9)'
+              : 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '15px',
+            border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+            mb: 3
+          }}>
+             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <PersonIcon sx={{ ml: 1.5 }} /> بخش‌های پرونده پزشکی
+            </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(0)}
+                >
+                  <PersonIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>اطلاعات فردی</Typography>
+            </Box>
+              </Grid>
+              
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(1)}
+                >
+                  <MedicalInfoIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>بیماری‌های وراثتی</Typography>
+            </Box>
+              </Grid>
+              
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(2)}
+                >
+                  <HeartIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>بیماری‌های مزمن</Typography>
+            </Box>
+              </Grid>
+              
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(3)}
+                >
+                  <AccessibilityIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>معلولیت‌ها</Typography>
+            </Box>
+              </Grid>
+              
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(4)}
+                >
+                  <AllergyIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>آلرژی‌ها</Typography>
+            </Box>
+              </Grid>
+              
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(5)}
+                >
+                  <ImageIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>تصاویر پزشکی</Typography>
+            </Box>
+        </Grid>
+
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(6)}
+                >
+                  <SurgeryIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>سوابق جراحی</Typography>
+                </Box>
+      </Grid>
+
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(7)}
+                >
+                  <HistoryEduIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>سوابق مراجعات</Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(8)}
+                >
+                  <CalendarIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>نوبت‌ها</Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={6} sm={4} md={3}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    borderRadius: '8px', 
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                      transform: 'translateY(-2px)'
+                    },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setActiveTab(9)}
+                >
+                  <MedicationIcon sx={{ mb: 1, fontSize: '2rem', color: 'primary.main' }} />
+                  <Typography>نسخه‌ها</Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+          
+          {/* Content for the selected tab */}
       <Paper sx={{ 
         p: 3,
-        background: 'rgba(255, 255, 255, 0.9)',
+            background: (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(30, 30, 30, 0.9)'
+              : 'rgba(255, 255, 255, 0.9)',
         backdropFilter: 'blur(12px)',
         borderRadius: '15px',
-        border: '1px solid rgba(0, 0, 0, 0.1)',
+            border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
       }}>
         <Tabs 
           value={activeTab} 
           onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-          sx={{
-                borderBottom: 1, 
-                borderColor: 'divider',
-            '& .MuiTab-root': {
-                  fontSize: '0.85rem',
-                  fontWeight: 'medium',
-                  px: { xs: 1, sm: 2 },
-                }
-              }}
+              sx={{ display: 'none' }}
             >
               <Tab label="اطلاعات فردی" />
               <Tab label="بیماری‌های وراثتی" />
@@ -1135,6 +1991,20 @@ function PatientDetails() {
                 <Grid item xs={12}>
                   <Typography variant="subtitle2" color="text.secondary">آدرس</Typography>
                   <Typography variant="body1">{patient.address || '-'}</Typography>
+                </Grid>
+                <Grid item xs={12} sx={{ mt: 2 }}>
+                  <Button 
+                    variant="outlined" 
+                    color="primary"
+                    onClick={() => {
+                      // Open dialog to edit patient info
+                      setDialogType('patient-info');
+                      setDialogData({ ...patient });
+                      setDialogOpen(true);
+                    }}
+                  >
+                    ویرایش اطلاعات بیمار
+                  </Button>
                 </Grid>
               </Grid>
             </TabPanel>
@@ -1204,7 +2074,7 @@ function PatientDetails() {
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <Typography variant="h6" gutterBottom>
                               {condition.name}
-                            </Typography>
+              </Typography>
                             <Box>
                               <IconButton size="small" onClick={() => openDialog('chronic-condition', condition)}>
                                 <EditIcon fontSize="small" />
@@ -1212,8 +2082,8 @@ function PatientDetails() {
                               <IconButton size="small" onClick={() => handleDelete('chronic-condition', condition.id)}>
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
-                            </Box>
-                          </Box>
+                  </Box>
+                </Box>
                           
                           <Typography variant="body2" color="text.secondary" gutterBottom>
                             <strong>تشخیص:</strong> {condition.diagnosis || 'ثبت نشده'}
@@ -1255,7 +2125,7 @@ function PatientDetails() {
                 >
                   افزودن معلولیت
                 </Button>
-              </Box>
+                </Box>
               
               {disabilities.length === 0 ? (
                 <Typography align="center" color="text.secondary">اطلاعاتی ثبت نشده است</Typography>
@@ -1284,8 +2154,8 @@ function PatientDetails() {
                   ))}
                 </List>
               )}
-            </TabPanel>
-            
+        </TabPanel>
+
             {/* Allergies Tab */}
             <TabPanel value={activeTab} index={4}>
               <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -1310,7 +2180,7 @@ function PatientDetails() {
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <Typography variant="h6" gutterBottom>
                               {allergy.name}
-                            </Typography>
+              </Typography>
                             <Box>
                               <IconButton size="small" onClick={() => openDialog('allergy', allergy)}>
                                 <EditIcon fontSize="small" />
@@ -1365,6 +2235,7 @@ function PatientDetails() {
                         <TableCell>توضیحات</TableCell>
                         <TableCell>مرکز تصویربرداری</TableCell>
                         <TableCell>تاریخ</TableCell>
+                        <TableCell>مرتبط با</TableCell>
                         <TableCell>عملیات</TableCell>
                       </TableRow>
                     </TableHead>
@@ -1386,7 +2257,7 @@ function PatientDetails() {
                                 />
                               ) : (
                                 <Box 
-              sx={{ 
+                  sx={{ 
                                     width: '100%', 
                                     height: '100%', 
                                     display: 'flex', 
@@ -1419,12 +2290,82 @@ function PatientDetails() {
                           </TableCell>
                           <TableCell>{image.description || '-'}</TableCell>
                           <TableCell>{image.center_name || '-'}</TableCell>
-                          <TableCell>{image.date || (image.created_at && new Date(image.created_at).toLocaleDateString('fa-IR')) || '-'}</TableCell>
+                          <TableCell>{formatDate(image.date || image.created_at)}</TableCell>
+                          <TableCell>
+                            {image.related_record_type === 'surgery' && (
+                              <Chip 
+                                size="small" 
+                                icon={<SurgeryIcon />} 
+                                label="جراحی"
+                                color="primary" 
+                                variant="outlined"
+                                onClick={() => setActiveTab(6)} // Navigate to surgeries tab
+                              />
+                            )}
+                            {image.related_record_type === 'visit' && (
+                              <Chip 
+                                size="small" 
+                                icon={<HistoryEduIcon />} 
+                                label="ویزیت"
+                                color="secondary" 
+                                variant="outlined"
+                                onClick={() => setActiveTab(7)} // Navigate to visits tab
+                              />
+                            )}
+                          </TableCell>
                           <TableCell>
                             <IconButton size="small" onClick={() => openDialog('medical-image', image)}>
                               <EditIcon fontSize="small" />
                             </IconButton>
                             <IconButton size="small" onClick={() => handleDelete('medical-image', image.id || image.ID)}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </TabPanel>
+            
+            {/* Surgery Records Tab */}
+            <TabPanel value={activeTab} index={6}>
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  onClick={() => openDialog('surgery')}
+                >
+                  افزودن سابقه جراحی
+                </Button>
+              </Box>
+              
+              {surgeries.length === 0 ? (
+                <Typography align="center" color="text.secondary">اطلاعاتی ثبت نشده است</Typography>
+              ) : (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>عنوان جراحی</TableCell>
+                        <TableCell>تاریخ</TableCell>
+                        <TableCell>توضیحات</TableCell>
+                        <TableCell>عملیات</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {surgeries.map((surgery) => (
+                        <TableRow key={surgery.id}>
+                          <TableCell>{surgery.name || '-'}</TableCell>
+                          <TableCell>{formatDate(surgery.date)}</TableCell>
+                          <TableCell>{surgery.description || '-'}</TableCell>
+                          <TableCell>
+                            <IconButton size="small" onClick={() => openDialog('surgery', surgery)}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" onClick={() => handleDelete('surgery', surgery.id)}>
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </TableCell>
@@ -1474,10 +2415,10 @@ function PatientDetails() {
                                  visit.type === 'doctor_visit' ? 'ویزیت پزشک' : 
                                  visit.type === 'prescription' ? 'نسخه‌نویسی' : 
                                  'مراجعه'}
-              </Typography>
+                  </Typography>
                               <Typography variant="subtitle2" color="text.secondary">
-                                {new Date(visit.date || visit.Date || visit.created_at || visit.CreatedAt).toLocaleDateString('fa-IR')}
-                              </Typography>
+                                {formatDate(visit.date || visit.Date || visit.created_at || visit.CreatedAt)}
+                  </Typography>
                             </Box>
                             
                             {/* Enhanced summary showing triage data */}
@@ -1485,7 +2426,7 @@ function PatientDetails() {
                 <Box sx={{ mt: 1 }}>
                                 <Typography variant="body2" color="text.secondary">
                                   <strong>علائم:</strong> {visit.TriageData.symptoms || visit.TriageData.Symptoms || '-'}
-                                </Typography>
+                  </Typography>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
                                   <Chip 
                                     size="small" 
@@ -1518,7 +2459,7 @@ function PatientDetails() {
                                       'success'
                                     }
                                   />
-                  </Box>
+                </Box>
                 </Box>
               )}
                             
@@ -1698,17 +2639,15 @@ function PatientDetails() {
                           .map((appointment) => (
                             <TableRow key={appointment.id || appointment.ID}>
                               <TableCell>
-                                {new Date(appointment.date || appointment.Date).toLocaleDateString('fa-IR')}
+                                {formatDate(appointment.date || appointment.Date)}
                               </TableCell>
                               <TableCell>
-                                {new Date(appointment.date || appointment.Date).toLocaleTimeString('fa-IR', {
-                                  hour: '2-digit', minute: '2-digit'
-                                })}
+                                {formatTime(appointment.date || appointment.Date)}
                               </TableCell>
                               <TableCell>{appointment.type || appointment.Type || 'ویزیت'}</TableCell>
-                              <TableCell>{appointment.description || appointment.Description || '-'}</TableCell>
+                              <TableCell>{appointment.notes || appointment.Notes || appointment.description || appointment.Description || '-'}</TableCell>
                               <TableCell>
-                                <Chip 
+              <Chip 
                                   size="small"
                                   label={appointment.status === 'scheduled' ? 'برنامه‌ریزی شده' : 
                                         appointment.status === 'completed' ? 'انجام شده' : 
@@ -1745,15 +2684,13 @@ function PatientDetails() {
                           .map((appointment) => (
                             <TableRow key={appointment.id || appointment.ID}>
                               <TableCell>
-                                {new Date(appointment.date || appointment.Date).toLocaleDateString('fa-IR')}
+                                {formatDate(appointment.date || appointment.Date)}
                               </TableCell>
                               <TableCell>
-                                {new Date(appointment.date || appointment.Date).toLocaleTimeString('fa-IR', {
-                                  hour: '2-digit', minute: '2-digit'
-                                })}
+                                {formatTime(appointment.date || appointment.Date)}
                               </TableCell>
                               <TableCell>{appointment.type || appointment.Type || 'ویزیت'}</TableCell>
-                              <TableCell>{appointment.description || appointment.Description || '-'}</TableCell>
+                              <TableCell>{appointment.notes || appointment.Notes || appointment.description || appointment.Description || '-'}</TableCell>
                               <TableCell>
                                 <Chip 
                                   size="small"
@@ -1802,7 +2739,7 @@ function PatientDetails() {
                               نسخه شماره {index + 1}
                   </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              {new Date(prescription.created_at || prescription.CreatedAt).toLocaleDateString('fa-IR')}
+                              {formatDate(prescription.created_at || prescription.CreatedAt)}
                   </Typography>
                           </Box>
                           
@@ -1867,7 +2804,7 @@ function PatientDetails() {
                 </Box>
               )}
         </TabPanel>
-          </Paper>
+      </Paper>
         </Grid>
       </Grid>
 
@@ -1892,10 +2829,12 @@ function PatientDetails() {
       <Box sx={{ mt: 4 }}>
         <Paper sx={{ 
           p: 3, 
-          background: 'rgba(255, 255, 255, 0.9)',
+          background: (theme) => theme.palette.mode === 'dark' 
+            ? 'rgba(30, 30, 30, 0.9)'
+            : 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(12px)',
           borderRadius: '15px',
-                 border: '1px solid rgba(0, 0, 0, 0.1)',
+          border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
         }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center' }}>
@@ -1936,7 +2875,7 @@ function PatientDetails() {
                                    'مراجعه'}
               </Typography>
                         <Typography variant="subtitle2" color="text.secondary">
-                          {new Date(visit.date || visit.Date || visit.created_at || visit.CreatedAt).toLocaleDateString('fa-IR')}
+                          {formatDate(visit.date || visit.Date || visit.created_at || visit.CreatedAt)}
                         </Typography>
                       </Box>
                       <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.5 }}>

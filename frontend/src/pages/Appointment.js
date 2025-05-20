@@ -16,14 +16,16 @@ import {
   MenuItem,
   FormHelperText,
 } from '@mui/material';
+import { Search as SearchIcon, PersonAdd as PersonAddIcon } from '@mui/icons-material';
 import axios from 'axios';
 
 function Appointment() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [patient, setPatient] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [nationalId, setNationalId] = useState('');
   const [dateError, setDateError] = useState('');
   const [appointmentData, setAppointmentData] = useState({
     date: '',
@@ -37,7 +39,10 @@ function Appointment() {
   const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    fetchPatientData();
+    if (id && id !== 'undefined') {
+      setLoading(true);
+      fetchPatientData();
+    }
   }, [id]);
 
   const fetchPatientData = async () => {
@@ -48,6 +53,30 @@ function Appointment() {
     } catch (error) {
       console.error('Error fetching patient data:', error);
       setError('خطا در دریافت اطلاعات بیمار');
+      setLoading(false);
+    }
+  };
+
+  const searchByNationalId = async () => {
+    if (!nationalId.trim()) {
+      setError('لطفا کد ملی را وارد کنید');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await axios.get(`http://localhost:8080/api/users/national-id/${nationalId}`);
+      if (response.data && (response.data.id || response.data.ID)) {
+        navigate(`/appointment/${response.data.id || response.data.ID}`);
+      } else {
+        setError('بیمار با این کد ملی یافت نشد');
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error searching by national ID:', error);
+      setError('بیمار با این کد ملی یافت نشد');
       setLoading(false);
     }
   };
@@ -108,14 +137,101 @@ function Appointment() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
         <CircularProgress />
       </Box>
     );
   }
 
   if (error) {
-    return <Alert severity="error">{error}</Alert>;
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{error}</Alert>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              setError('');
+              setNationalId('');
+              navigate('/appointment');
+            }}
+          >
+            بازگشت
+          </Button>
+        </Box>
+      </Box>
+    );
+  }
+
+  // If no patient is loaded, show the National ID search interface
+  if (!patient) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '80vh',
+        background: 'linear-gradient(to bottom, #f5f5f5, #e0e0e0)'
+      }}>
+        <Paper sx={{ 
+          p: 4,
+          width: '90%',
+          maxWidth: '500px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          boxShadow: 3,
+          borderRadius: 2
+        }}>
+          <Typography variant="h5" gutterBottom align="center" sx={{ mb: 3 }}>
+            جستجو با کد ملی برای نوبت‌دهی
+          </Typography>
+          
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="کد ملی بیمار را وارد کنید..."
+            value={nationalId}
+            onChange={(e) => setNationalId(e.target.value)}
+            sx={{ mb: 3 }}
+            inputProps={{ style: { textAlign: 'center' } }}
+          />
+          
+          <Button 
+            variant="contained"
+            fullWidth
+            size="large"
+            onClick={searchByNationalId}
+            sx={{ 
+              mb: 2,
+              height: '50px', 
+              borderRadius: 2,
+              fontSize: '1rem',
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              color: 'white',
+              boxShadow: '0 4px 6px rgba(33, 150, 243, 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #1976D2 30%, #0FAFD8 90%)',
+              }
+            }}
+            startIcon={<SearchIcon />}
+          >
+            جستجو
+          </Button>
+          
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => navigate('/patients/new')}
+            sx={{ width: '60%', mt: 2 }}
+            startIcon={<PersonAddIcon />}
+          >
+            ثبت بیمار جدید
+          </Button>
+        </Paper>
+      </Box>
+    );
   }
 
   return (

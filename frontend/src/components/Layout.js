@@ -52,7 +52,7 @@ function Layout({ children }) {
   const drawerWidth = 280;
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', direction: 'rtl' }}>
       {/* App Bar */}
       <AppBar 
         position="fixed" 
@@ -66,23 +66,11 @@ function Layout({ children }) {
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           left: 0,
           right: 0,
-          width: '100%'
+          width: '100%',
+          direction: 'rtl'
         }}
       >
-        <Toolbar sx={{ justifyContent: 'space-between', flexDirection: 'row-reverse' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton
-              color="inherit"
-              onClick={() => setDrawerOpen(!drawerOpen)}
-              sx={{
-                ml: 1,
-              }}
-            >
-              <MenuIcon />
-            </IconButton>
-            <ThemeToggle />
-          </Box>
-          
+        <Toolbar sx={{ justifyContent: 'space-between', direction: 'rtl' }}>
           <Typography 
             variant="h6" 
             component="div" 
@@ -95,22 +83,34 @@ function Layout({ children }) {
           >
             سیستم مدیریت هوشمند مدارک پزشکی بارمان
           </Typography>
-          
+
           <Button 
             color="inherit" 
             onClick={handleLogout} 
             startIcon={<ExitToAppIcon />}
             sx={{
               '& .MuiButton-startIcon': {
-                marginLeft: '4px',
-                marginRight: '4px',
+                marginLeft: '8px',
+                marginRight: '-4px',
               },
+              direction: 'rtl',
               whiteSpace: 'nowrap',
               color: muiTheme.palette.primary.main
             }}
           >
             خروج
           </Button>
+
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <ThemeToggle />
+            <IconButton
+              color="inherit"
+              onClick={() => setDrawerOpen(!drawerOpen)}
+              sx={{ mr: 1 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -120,12 +120,13 @@ function Layout({ children }) {
         sx={{
           flexGrow: 1,
           width: drawerOpen ? `calc(100% - ${drawerWidth}px)` : '100%',
-          ml: 0,
-          mr: drawerOpen ? `${drawerWidth}px` : 0,
+          ml: drawerOpen ? `${drawerWidth}px` : 0,
+          mr: 0,
           position: 'relative',
           padding: 3,
           backgroundColor: 'background.default',
           marginTop: '64px',
+          direction: 'rtl',
           transition: muiTheme.transitions.create(['margin', 'width'], {
             easing: muiTheme.transitions.easing.sharp,
             duration: muiTheme.transitions.duration.leavingScreen,
@@ -140,24 +141,25 @@ function Layout({ children }) {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         variant={isMobile ? "temporary" : "persistent"}
-        anchor="right"
+        anchor="left"
         sx={{
           display: 'block',
           '& .MuiDrawer-paper': {
             position: 'fixed',
             top: '64px',
-            right: 0,
+            left: 0,
             width: drawerWidth,
             height: 'calc(100% - 64px)',
             backgroundColor: darkMode ? 'background.paper' : '#f8f9fa',
             boxSizing: 'border-box',
-            borderLeft: darkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.12)',
-            borderRight: 'none',
+            borderRight: darkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.12)',
+            borderLeft: 'none',
+            direction: 'rtl'
           },
         }}
         ModalProps={{ keepMounted: true }}
       >
-        <Box sx={{ overflow: 'auto' }}>
+        <Box sx={{ overflow: 'auto', direction: 'rtl' }}>
           <List>
             {menuItems.map((item) => (
               <ListItem 
@@ -179,6 +181,7 @@ function Layout({ children }) {
                   '&:last-child': { borderBottom: 'none' },
                   padding: '16px 24px',
                   textAlign: 'right',
+                  direction: 'rtl',
                   transition: 'all 0.3s ease',
                   '&:hover .MuiListItemIcon-root': {
                     color: muiTheme.palette.primary.main,
@@ -189,6 +192,17 @@ function Layout({ children }) {
                   }
                 }}
               >
+                <ListItemIcon 
+                  sx={{ 
+                    minWidth: 40,
+                    color: 'text.secondary',
+                    transition: 'all 0.3s ease',
+                    marginLeft: 2,
+                    marginRight: -1
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
                 <ListItemText 
                   primary={item.text}
                   primaryTypographyProps={{ 
@@ -197,15 +211,6 @@ function Layout({ children }) {
                   }}
                   sx={{ textAlign: 'right' }}
                 />
-                <ListItemIcon 
-                  sx={{ 
-                    minWidth: 40,
-                    color: 'text.secondary',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {item.icon}
-                </ListItemIcon>
               </ListItem>
             ))}
           </List>
@@ -222,6 +227,7 @@ function Layout({ children }) {
                 },
                 padding: '16px 24px',
                 textAlign: 'right',
+                direction: 'rtl',
                 transition: 'all 0.3s ease',
                 '&:hover .MuiListItemIcon-root': {
                   color: muiTheme.palette.error.main,
@@ -232,6 +238,17 @@ function Layout({ children }) {
                 }
               }}
             >
+              <ListItemIcon 
+                sx={{ 
+                  minWidth: 40,
+                  color: 'text.secondary',
+                  transition: 'all 0.3s ease',
+                  marginLeft: 2,
+                  marginRight: -1
+                }}
+              >
+                <ExitToAppIcon />
+              </ListItemIcon>
               <ListItemText 
                 primary="خروج" 
                 primaryTypographyProps={{ 
@@ -240,15 +257,6 @@ function Layout({ children }) {
                 }}
                 sx={{ textAlign: 'right' }}
               />
-              <ListItemIcon 
-                sx={{ 
-                  minWidth: 40,
-                  color: 'text.secondary',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <ExitToAppIcon />
-              </ListItemIcon>
             </ListItem>
           </List>
         </Box>

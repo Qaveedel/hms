@@ -15,6 +15,117 @@ const commonSettings = {
       styleOverrides: {
         root: {
           fontWeight: 'bold',
+          textAlign: 'right',
+          justifyContent: 'flex-start',
+          '& .MuiButton-startIcon': {
+            marginLeft: '8px',
+            marginRight: '-4px',
+          },
+          '& .MuiSvgIcon-root': {
+            marginLeft: '8px',
+            marginRight: '-4px',
+          }
+        },
+        startIcon: {
+          marginLeft: '8px',
+          marginRight: '-4px',
+        }
+      },
+      defaultProps: {
+        disableRipple: false,
+      },
+    },
+    MuiTextField: {
+      defaultProps: {
+        dir: 'rtl',
+        inputProps: {
+          dir: 'rtl',
+        },
+      },
+    },
+    MuiInputBase: {
+      defaultProps: {
+        dir: 'rtl',
+      },
+    },
+    MuiFormControl: {
+      defaultProps: {
+        dir: 'rtl',
+      },
+    },
+    MuiSelect: {
+      defaultProps: {
+        dir: 'rtl',
+      },
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          direction: 'rtl',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          textAlign: 'right',
+        },
+      },
+    },
+    MuiList: {
+      styleOverrides: {
+        root: {
+          direction: 'rtl',
+        },
+      },
+    },
+    MuiListItem: {
+      styleOverrides: {
+        root: {
+          direction: 'rtl',
+          textAlign: 'right',
+        },
+      },
+    },
+    MuiDialog: {
+      defaultProps: {
+        dir: 'rtl',
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          textAlign: 'right',
+        },
+      },
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: {
+          textAlign: 'right',
+        },
+      },
+    },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: {
+          direction: 'rtl',
+          justifyContent: 'flex-start',
+        },
+      },
+    },
+    MuiAlert: {
+      styleOverrides: {
+        root: {
+          direction: 'rtl',
+          textAlign: 'right',
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          direction: 'rtl',
         },
       },
     },

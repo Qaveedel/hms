@@ -191,10 +191,10 @@ function Prescription() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedMedication, setSelectedMedication] = useState(null);
   const [medicationDetails, setMedicationDetails] = useState({
-    dosage: '',
+      dosage: '',
     frequency: '',
     duration: '',
-    instructions: '',
+      instructions: '',
     quantity: 1,
   });
   const [openMedicationDialog, setOpenMedicationDialog] = useState(false);
@@ -203,7 +203,7 @@ function Prescription() {
 
   useEffect(() => {
     if (id) {
-      fetchPatientData();
+    fetchPatientData();
       fetchVisitData();
       fetchDiagnosisData();
     } else {
@@ -326,10 +326,10 @@ function Prescription() {
     setMedications([...medications, newMedication]);
     setSelectedMedication(null);
     setMedicationDetails({
-      dosage: '',
+        dosage: '',
       frequency: '',
       duration: '',
-      instructions: '',
+        instructions: '',
       quantity: 1,
     });
     setSearchTerm('');
@@ -496,7 +496,7 @@ function Prescription() {
           افزودن دارو
         </Typography>
 
-        <Grid container spacing={3}>
+          <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
             <Autocomplete
               value={searchTerm}
@@ -538,7 +538,7 @@ function Prescription() {
                     label={`${selectedMedication.brand_name} (${selectedMedication.generic_name}) ${selectedMedication.strength}`} 
                     color="primary" 
                   />
-                  <IconButton 
+                  <IconButton
                     size="small" 
                     color="primary" 
                     onClick={() => showMedicationInfo(selectedMedication)}
@@ -549,39 +549,39 @@ function Prescription() {
               </Grid>
 
               <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
+                      <TextField
+                        fullWidth
                   label="دُز مصرفی"
                   name="dosage"
                   value={medicationDetails.dosage}
                   onChange={handleMedicationDetailsChange}
-                  required
-                />
-              </Grid>
+                        required
+                      />
+                    </Grid>
 
               <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
+                      <TextField
+                        fullWidth
                   label="تناوب مصرف"
                   name="frequency"
                   value={medicationDetails.frequency}
                   onChange={handleMedicationDetailsChange}
-                  required
+                        required
                   placeholder="مثلا: هر 8 ساعت"
-                />
-              </Grid>
+                      />
+                    </Grid>
 
               <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
+                      <TextField
+                        fullWidth
                   label="مدت مصرف"
                   name="duration"
                   value={medicationDetails.duration}
                   onChange={handleMedicationDetailsChange}
-                  required
+                        required
                   placeholder="مثلا: 10 روز"
-                />
-              </Grid>
+                      />
+                    </Grid>
 
               <Grid item xs={12} md={3}>
                 <TextField
@@ -594,7 +594,7 @@ function Prescription() {
                   required
                   inputProps={{ min: 1 }}
                 />
-              </Grid>
+                  </Grid>
 
               <Grid item xs={12}>
                 <TextField
@@ -609,16 +609,16 @@ function Prescription() {
                 />
               </Grid>
 
-              <Grid item xs={12}>
-                <Button 
+            <Grid item xs={12}>
+              <Button
                   variant="contained" 
                   color="primary" 
-                  startIcon={<AddIcon />}
+                startIcon={<AddIcon />}
                   onClick={addMedicationToPrescription}
-                >
+              >
                   افزودن به نسخه
-                </Button>
-              </Grid>
+              </Button>
+            </Grid>
             </>
           )}
         </Grid>
@@ -666,21 +666,21 @@ function Prescription() {
       )}
 
       <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          onClick={() => navigate(`/patients/${id}`)}
-        >
-          انصراف
-        </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate(`/patients/${id}`)}
+                >
+                  انصراف
+                </Button>
 
         <Box>
-          <Button
-            variant="contained"
-            color="primary"
+                <Button
+                  variant="contained"
+                  color="primary"
             onClick={handleSubmit}
             disabled={medications.length === 0}
             sx={{ ml: 2 }}
-          >
+                >
             ثبت نسخه و ادامه
           </Button>
 
@@ -691,8 +691,8 @@ function Prescription() {
             sx={{ ml: 2 }}
           >
             ثبت و بازگشت
-          </Button>
-        </Box>
+                </Button>
+              </Box>
       </Box>
 
       {/* Medication Information Dialog */}
